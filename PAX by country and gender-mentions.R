@@ -201,19 +201,27 @@ d3_dat %>%
 
 
 
-rbind(c_nodes, a_nodes) %>% 
-  forceNetwork(Links = links,
-               Nodes = .,
-               Source = "from",
-               Target = "to",
-               NodeID = "NodeId",
-               Group = "Type",
-               linkWidth = 1,
-               linkColour = "#afafaf", fontSize=12, zoom=T,
-               Nodesize = "size",
-               opacity = 0.8, charge=-300,
-               width = 600, height = 400
-               )
+nodes <- rbind(c_nodes, a_nodes)
+forceNetwork(Links = links,
+             Nodes = nodes,
+             Source = "from",
+             Target = "to",
+             NodeID = "id",
+             Group = "Type",
+             linkWidth = 1,
+             linkColour = "#afafaf", fontSize=12, zoom=T,
+             Nodesize = "size",
+             opacity = 0.8, charge=-300,
+             width = 600, height = 400
+)
+
+li2 <- data.frame(from = 0:4, to = c(1,2,2,3,4))
+no2 <- data.frame(
+  id = 0:4,
+  grp = 1
+)  
+
+forceNetwork(Links = li2, Nodes = no2, Source = "from", Target = "to", NodeID = "id", Group = "grp")
 
 # visNetwork --------------------------------------------------------------
 
@@ -225,11 +233,12 @@ nodes <- rbind(c_nodes, a_nodes) %>%
   mutate(id = as.character(id),
          font.size = 30)
 
-visNetwork(nodes = nodes, edges = links %>% mutate_all(as.character),
+visgraph <- visNetwork(nodes = nodes, edges = links %>% mutate_all(as.character),
            height = "900px",
            width = "1200px"
            )
 
+visSave(visgraph, "networkgraph.html")
 
 # summarise data for country ----------------------------------------------
 
