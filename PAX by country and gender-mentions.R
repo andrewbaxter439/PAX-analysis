@@ -1,36 +1,9 @@
+library(visNetwork)
 library(tidyverse)
 library(lubridate)
 library(igraph)
-library(networkD3)
 library(magrittr)
-
-# setting up code using IRE example ---------------------------------------
-# 
-# 
-# country <- "Ireland"
-# nat_desc <- "Irish"
-# 
-# 
-# search_string <- paste(c(country, nat_desc), collapse = "|")
-# 
-# pax_dat_IRE <- read_csv(paste0("Data/", country, "-paxdata.csv"))
-# 
-# 
-# IRE_tidy <- pax_dat %>% 
-#   # mutate(Dat = dmy(Dat)) %>% 
-#   filter(Dat >= dmy("01/01/2000")) %>% 
-#   # mutate(PPName = str_replace_all(PPName, "Northern Ireland", "NI"))
-#   mutate_all(~ str_replace_all(., "Northern Ireland", "NI")) %>% 
-#   filter_all(any_vars(str_detect(., search_string)))
-# 
-# IRE_tidy %>% 
-#   # mutate_all(~replace(., is.na(.), 0)) %>% 
-#   mutate(ThrdParty = ifelse(is.na(ThrdPart), "none", ThrdPart)) %>% 
-#   mutate(Con = as.integer(str_detect(.$Con, search_string)),
-#          Part = as.integer(str_detect(.$Part, search_string)),
-#          ThrdPart= as.integer(str_detect(.$ThrdParty, search_string))) %>% 
-#   select(Agt, PPName, Con, Part, ThrdPart, GeWom)
-
+library(export)
 
 # Function to search countries --------------------------------------------
 # countries <- str_split("United Kingdom, Austria, Ireland, Croatia, Slovak, Slovenia, New Zealand, Finland, Estonia", ", ")[[1]]
@@ -145,7 +118,7 @@ V(pax_net)$color[13:118] <- spot_cols[which(spot_cols$AgtId %in% V(pax_net)$name
 V(pax_net)$frame.color <- NA
 V(pax_net)$size[1:12] <- 10
 V(pax_net)$size[13:118] <- 5
-V(pax_net)$label[1:12] <- V(pax_net)$name[1:12]
+V(pax_net)$label[1:12] <- gsub(" ", "\n", V(pax_net)$name[1:12])
 V(pax_net)$label[13:118] <- NA
 V(pax_net)$label.cex <- 0.7
 E(pax_net)$arrow.mode <- 0
@@ -156,89 +129,91 @@ phil_pp <- countries_data_tidy_plus %>% filter(PP == 95) %>% pull(AgtId)
 afg_pp <- countries_data_tidy_plus %>% filter(PP == 2) %>% pull(AgtId)
 sri_pp <- countries_data_tidy_plus %>% filter(PP == 124) %>% pull(AgtId)
 
-groups_list <- list(which(V(pax_net)$name %in% ni_pp),
-                    which(V(pax_net)$name %in% phil_pp),
-                    which(V(pax_net)$name %in% sri_pp),
-                    which(V(pax_net)$name %in% afg_pp))
+groups_list <- list(which(V(pax_net)$name %in% ni_pp$AgtId),
+                    which(V(pax_net)$name %in% phil_pp$AgtId),
+                    which(V(pax_net)$name %in% sri_pp$AgtId),
+                    which(V(pax_net)$name %in% afg_pp$AgtId),
+                    which(V(pax_net)$name %in% ukr_pp$AgtId))
 
-plot(pax_net, mark.groups = groups_list, mark.col = NA)
+tkplot(pax_net, mark.groups = groups_list, mark.col = NA)
+coords <-  tk_coords("1")/500
 
+svg("igraph_plot.svg")
+plot(pax_net, mark.groups = groups_list, layout = coords, mark.col = NA,
+     rescale = FALSE,
+     xlim = c(0,max(coords[,1])),
+     ylim = c(0,max(coords[,2])))
+dev.off()
 
-# NetworkD3 ---------------------------------------------------------------
-
-library(networkD3)
-
-d3_dat <- countries_data_tidy_plus %>% 
-  select(Country, AgtId) %>% 
-  mutate(from = as.numeric(factor(Country))-1,
-         to   = as.numeric(AgtId))
-
-links <- d3_dat %>% select(from, to)
-
-AI_code <- countries_data_tidy_plus %>% 
-  select(AgtId, PPName) %>% 
-  unique() %>% 
-  filter(PPName != "NI peace process")
-
-c_nodes <-
-d3_dat %>% 
-  select(label = Country, id = from) %>% 
-  unique() %>% 
-  mutate(title = NA, Type = "Country", color.background = "skyblue", size = 40)
-
-a_nodes  <- 
-d3_dat %>% 
-  select(AgtId, id = to) %>% 
-  unique() %>% 
-  left_join(AI_code, by = "AgtId") %>% 
-  left_join(spot_cols %>% select(AgtId, color.background = col), by = "AgtId", copy = FALSE) %>% 
-  unique() %>% 
-  mutate(title = PPName, label = NA, Type = "Agt", size = 10) %>% 
-  select(-PPName, -AgtId)
-
-
-# d3 failure --------------------------------------------------------------
+svg("igraph_plot_ng.svg")
+plot(pax_net, layout = coords,
+     rescale = FALSE,
+     xlim = c(0,max(coords[,1])),
+     ylim = c(0,max(coords[,2])))
+dev.off()
 
 
 
-nodes <- rbind(c_nodes, a_nodes)
-forceNetwork(Links = links,
-             Nodes = nodes,
-             Source = "from",
-             Target = "to",
-             NodeID = "id",
-             Group = "Type",
-             linkWidth = 1,
-             linkColour = "#afafaf", fontSize=12, zoom=T,
-             Nodesize = "size",
-             opacity = 0.8, charge=-300,
-             width = 600, height = 400
-)
+# legend ------------------------------------------------------------------
 
-li2 <- data.frame(from = 0:4, to = c(1,2,2,3,4))
-no2 <- data.frame(
-  id = 0:4,
-  grp = 1
-)  
+legend_df <- tibble(`Peace Process` = factor(unique(groups$PPName)[c(1,2,4,3,5)]),
+       col = rainbow(5),
+       y = 1:5,
+       x = 1:5)
 
-forceNetwork(Links = li2, Nodes = no2, Source = "from", Target = "to", NodeID = "id", Group = "grp")
+col_vectors <- legend_df$col
+names(col_vectors) <- legend_df$`Peace Process`
 
+legend_df %>% 
+  ggplot(aes(x,y,col = `Peace Process`)) +
+  geom_line(size = 2) + 
+  scale_color_manual(values = col_vectors) + 
+  theme_void()
+
+graph2ppt(last_plot(), "igraph_legend.pptx")
 # visNetwork --------------------------------------------------------------
 
+ni_pp   <- countries_data_tidy_plus %>% filter(PP == 68)  %>% select(PPName, PP, AgtId)
+phil_pp <- countries_data_tidy_plus %>% filter(PP == 95)%>% select(PPName, PP, AgtId)
+afg_pp  <- countries_data_tidy_plus %>% filter(PP == 2)  %>% select(PPName, PP, AgtId)
+sri_pp  <- countries_data_tidy_plus %>% filter(PP == 124)%>% select(PPName, PP, AgtId)
+ukr_pp  <- countries_data_tidy_plus %>% filter(PPName == "Ukraine peace process")%>% select(PPName, PP, AgtId)
 
+groups <- bind_rows(
+  ni_pp %>% filter(PPName == "Northern Ireland peace process"),
+  phil_pp,
+  afg_pp,
+  sri_pp,
+  ukr_pp
+) %>% 
+  mutate(id = AgtId)
 
-library(visNetwork)
+nodes %>% 
+  group_by(title) %>% 
+  count() %>% 
+  arrange(desc(n))
+  
 
 nodes <- rbind(c_nodes, a_nodes) %>% 
   mutate(id = as.character(id),
-         font.size = 30)
+         font.size = 30,
+         group = Type)
 
 visgraph <- visNetwork(nodes = nodes, edges = links %>% mutate_all(as.character),
            height = "900px",
            width = "1200px"
            )
 
-visSave(visgraph, "networkgraph.html")
+visgraph <- visNetwork(nodes = nodes, edges = links %>% mutate_all(as.character),
+           height = "900px",
+           width = "1200px"
+# ) %>% visGroups(groupname = "Country", shape = "triangle") %>% 
+) %>% visGroups(groupname = "Country", shape = "icon", icon = list(code = "f024", size = 100),
+                shadow = list(enabled  = TRUE)) %>%
+  visGroups(groupname = "Agt", shape = "circle") %>% 
+  addFontAwesome()
+
+visSave(visgraph, "networkgraph_2.html")
 
 # summarise data for country ----------------------------------------------
 
