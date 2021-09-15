@@ -1,0 +1,145 @@
+---
+title: "pax_report"
+author: "Andrew Baxter"
+date: "30/09/2019"
+output: powerpoint_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error = FALSE)
+library(visNetwork)
+library(tidyverse)
+library(lubridate)
+library(igraph)
+library(magrittr)
+library(export)
+country_pax <- function(..., dat = pax_dat){
+  
+search_string <- paste(c(...), collapse = "|")
+
+# dat <- read_csv(paste0("Data/all-paxdata.csv"))
+if ("Ireland" %in% c(...)) {
+  dat <- dat %>% mutate_at(vars(-Dat, -GeWom), ~ str_replace_all(., "Northern Ireland", "NI"))
+} 
+
+dat_tidy <- dat %>% 
+  # mutate(Dat = dmy(Dat)) %>% 
+  filter(Dat >= dmy("01/01/2000")) %>% 
+  # mutate(PPName = str_replace_all(PPName, "Northern Ireland", "NI"))
+  # mutate_all(~ str_replace_all(., "Northern Ireland", "NI")) %>% 
+  filter_all(any_vars(str_detect(., search_string)))
+
+dat_tidy %>%
+  mutate(ThrdParty = ifelse(is.na(ThrdPart), "none", ThrdPart)) %>% 
+  mutate(InName = as.integer(str_detect(.$Agt, search_string)),
+         Con = as.integer(str_detect(.$Con, search_string)),
+         Part = as.integer(str_detect(.$Part, search_string)),
+         ThrdPart= as.integer(str_detect(.$ThrdParty, search_string))) %>% 
+  mutate(Country = c(...)[1],
+         Contry_of_conflict = Con,
+         Party_or_mediator = ifelse(Con==0 & Part ==1, 1, 0),
+         Observer_or_3rdparty = ifelse(Con==0 & Part ==0 & ThrdPart == 1, 1, 0),
+         Host = ifelse(Con == 0 & Part == 0 & ThrdPart == 0 & InName == 1, 1, 0),
+         AgtId = factor(AgtId),
+         PP = factor(PP)) %>% 
+  select(Country, AgtId, PPName, PP, Dat, Contry_of_conflict, Party_or_mediator, Observer_or_3rdparty, Host, GeWom)
+
+}
+```
+
+## Slide with R Output
+
+```{r intro, echo = TRUE}
+pax_dat <- read_csv(paste0("Data/all-paxdata.csv"))
+
+```
+
+```{r func_create,eval=FALSE}
+country_pax <- function(..., dat = pax_dat){
+  # Tidying up here
+}
+```
+
+```{r more_dat}
+countries_plus <- list(
+  c("United Kingdom", "UK", "London", "Britain"),
+  c("Ireland", "Irish", "Dublin"),
+  c("Estonia", "Tallinn"),
+  c("Austria", "Vienna"),
+  c("Croatia", "Croat", "Zagreb"),
+  c("Slovakia", "Slovak", "Bratislava"),
+  c("Slovenia", "Ljubljana"),
+  c("Finland", "Finnish", "Helsinki"),
+  c("New Zealand", "Wellington"),
+  c("Denmark", "Danish", "Copenhagen"),
+  c("Norway", "Norwegian", "Oslo"),
+  c("Sweden", "Swed", "Stockholm")
+)
+
+
+all_countries_plus <- map(countries_plus, country_pax)
+
+countries_data_tidy_plus <- reduce(all_countries_plus, bind_rows)
+```
+
+## Slide with Plot
+
+```{r data}
+countries_data_tidy_plus
+```
+
+## iGraph setup
+
+```{r igraph_setup, eval=FALSE}
+pax_net <- countries_data_tidy_plus %>% graph_from_data_frame()
+spot_cols <- countries_data_tidy_plus %>% 
+  select(AgtId, GeWom, Contry_of_conflict, Party_or_mediator, Observer_or_3rdparty, Host) %>% 
+  mutate(col = ifelse(GeWom == 1,"#5566FF", "#FFcc00"),
+         cat = ifelse(Contry_of_conflict == 1, 1,
+                       ifelse(Party_or_mediator == 1, 2, 
+                              ifelse(Observer_or_3rdparty == 1, 3, 4))) 
+         )
+
+V(pax_net)$color[1:12] <- "skyblue"
+V(pax_net)$color[13:118] <- spot_cols[which(spot_cols$AgtId %in% V(pax_net)$name[13:118]), "col"]$col
+V(pax_net)$frame.color <- NA
+V(pax_net)$size[1:12] <- 10
+V(pax_net)$size[13:118] <- 5
+V(pax_net)$label[1:12] <- gsub(" ", "\n", V(pax_net)$name[1:12])
+V(pax_net)$label[13:118] <- NA
+V(pax_net)$label.cex <- 0.7
+E(pax_net)$arrow.mode <- 0
+  
+
+ni_pp <- countries_data_tidy_plus %>% filter(PP == 68) %>% pull(AgtId)
+phil_pp <- countries_data_tidy_plus %>% filter(PP == 95) %>% pull(AgtId)
+afg_pp <- countries_data_tidy_plus %>% filter(PP == 2) %>% pull(AgtId)
+sri_pp <- countries_data_tidy_plus %>% filter(PP == 124) %>% pull(AgtId)
+
+groups_list <- list(which(V(pax_net)$name %in% ni_pp$AgtId),
+                    which(V(pax_net)$name %in% phil_pp$AgtId),
+                    which(V(pax_net)$name %in% sri_pp$AgtId),
+                    which(V(pax_net)$name %in% afg_pp$AgtId),
+                    which(V(pax_net)$name %in% ukr_pp$AgtId))
+```
+
+```{r ig_call, eval = FALSE}
+plot(pax_net, mark.groups = groups_list, mark.col = NA)
+```
+
+## Netvis setup
+
+```{r netVis_setup, eval = FALSE}
+visgraph <- visNetwork(nodes = nodes, 
+                       edges = links %>% mutate_all(as.character),
+                       height = "900px",
+                       width = "1200px") %>% 
+  visGroups(groupname = "Country",
+            shape = "icon", 
+            icon = list(code = "f024", size = 100),
+            shadow = list(enabled  = TRUE)) %>%
+  visGroups(groupname = "Agt", shape = "circle") %>% 
+  addFontAwesome()
+
+```
+

@@ -63,6 +63,8 @@ all_countries_plus <- map(countries_plus, country_pax)
 
 countries_data_tidy_plus <- reduce(all_countries_plus, bind_rows)
 
+countries_data_tidy_plus
+
 countries_data_tidy_plus %>% 
   group_by(Country, GeWom) %>% 
   summarise(
@@ -83,10 +85,10 @@ countries_data_tidy_plus %>%
   geom_bar(stat = "identity", position = "fill") +
   coord_flip() +
   theme_minimal(base_family = "IBM Plex Sans") +
-  theme(text = element_text(family = "sans", size = 8),
+  theme(text = element_text(family = "sans", size = 12),
         panel.grid.major.y = element_blank(),
         panel.grid.minor.x = element_blank()) +
-  geom_text(aes(label = ifelse(val==0, NA, val), y = lab_y), hjust = 0.5, position = "stack", size = 3) +
+  geom_text(aes(label = ifelse(val==0, NA, val), y = lab_y), hjust = 0.5, position = "stack", size = 4) +
   facet_wrap(~ Country, scales = "free") +
   scale_fill_manual(values = c("#FFcc00", "#5566FF"),
                     name = "Reference to Gender\nin agreement",
@@ -98,8 +100,8 @@ countries_data_tidy_plus %>%
                    limits = c("Agts_host", "Agts_Obs", "Agts_par", "Agts_con"),
                    name = NULL)
 
-# ggsave("pax_graph2.png", units = "mm", width = 200, height = 100)
-
+# ggsave("pax_graph2.png", units = "mm", width = 320, height = 180)
+# export::graph2ppt(last_plot(), "pax_graph.pptx", aspectr = 16/9, width = 12)
 
 # igraph? -----------------------------------------------------------------
 
